@@ -1,9 +1,10 @@
 package com.example.plugins
 
+import com.example.App.gson
 import com.example.model.auth.CreateUserRequest
 import com.example.model.auth.LoginRequest
 import com.example.repository.UserRepository
-import com.google.gson.Gson
+import com.example.response.ApiResponse
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*
@@ -20,15 +21,17 @@ fun Application.configureRouting() {
     routing {
         route("/user") {
             post ("/register") {
-                val request = Gson().fromJson(call.receiveText(), CreateUserRequest::class.java)
+                val request = gson.fromJson(call.receiveText(), CreateUserRequest::class.java)
 //                val request = call.receive(CreateUserRequest::class)
                 if (
                     !request.name.isNullOrBlank() &&
+                    !request.email.isNullOrBlank() &&
                     !request.phone.isNullOrBlank() &&
                     !request.password.isNullOrBlank()
                 ) {
                     val userId = UserRepository.createUser(
                         request.name,
+                        request.email,
                         request.phone,
                         request.password
                     )
@@ -48,7 +51,7 @@ fun Application.configureRouting() {
                 headers {
                     this["Content-Type"] = "application/json"
                 }
-                val request = Gson().fromJson(call.receiveText(), LoginRequest::class.java)
+                val request = gson.fromJson(call.receiveText(), LoginRequest::class.java)
 //                val request = call.receive(LoginRequest::class)
                 if (
                     !request.phone.isNullOrBlank() &&
@@ -58,7 +61,17 @@ fun Application.configureRouting() {
                         request.password
                     )
                     if (user != null) {
-                        call.respond(user)
+                        call.respond(
+                            HttpStatusCode.OK,
+                            gson.toJson(
+                                ApiResponse(
+                                    error = false,
+                                    status = HttpStatusCode.OK.value,
+                                    message = "Success",
+                                    data = user.getUserData()
+                                )
+                            )
+                        )
                     } else {
                         call.respond(
                             HttpStatusCode.NotFound
@@ -72,15 +85,25 @@ fun Application.configureRouting() {
                 }
             }
 
-            get ("/{id}") {
-                val param = call.receiveParameters()
-                val userId = param["id"]
+            get {
+//                val param = call.receiveParameters()
+                val userId = call.request.queryParameters["id"]
 
                 if (userId != null) {
                     val user = UserRepository.getUserDetails(userId.toInt())
 
                     if (user != null) {
-                        call.respond(user)
+                        call.respond(
+                            HttpStatusCode.OK,
+                            gson.toJson(
+                                ApiResponse(
+                                    error = false,
+                                    status = HttpStatusCode.OK.value,
+                                    message = "Success",
+                                    data = user.getUserData()
+                                )
+                            )
+                        )
                     } else {
                         call.respond(
                             HttpStatusCode.NotFound,
@@ -95,9 +118,9 @@ fun Application.configureRouting() {
                 }
             }
 
-            delete ("/{id}") {
-                val param = call.receiveParameters()
-                val userId = param["id"]
+            delete {
+//                val param = call.receiveParameters()
+                val userId = call.request.queryParameters["id"]
 
                 if (userId != null) {
                     val isDeleted = UserRepository.deleteUser(userId.toInt())
